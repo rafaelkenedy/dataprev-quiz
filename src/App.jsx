@@ -39,6 +39,34 @@ function shuffleOptions(qq) {
   return { ...qq, opts: perm.map((i) => qq.opts[i]), ans: LETTERS[perm.indexOf(correctIdx)] };
 }
 
+const Fig = ({ src }) => <img className="fig" src={src} alt="Figura da questão original (FGV)" />;
+
+// Enunciado com figuras: a do texto-base compartilhado ("contexto-…") fica logo após o texto-base,
+// antes da pergunta; as da própria questão ficam depois do enunciado.
+function QuestionBody({ qq }) {
+  const imgs = qq.imgs || [];
+  const ctxImgs = imgs.filter((src) => src.includes('/contexto-'));
+  const ownImgs = imgs.filter((src) => !src.includes('/contexto-'));
+  const split = ctxImgs.length ? qq.q.indexOf('\n\n') : -1;
+  return (
+    <>
+      {split > 0 ? (
+        <>
+          <p className="stem">{qq.q.slice(0, split)}</p>
+          {ctxImgs.map((src) => <Fig key={src} src={src} />)}
+          <p className="stem">{qq.q.slice(split + 2)}</p>
+        </>
+      ) : (
+        <>
+          <p className="stem">{qq.q}</p>
+          {ctxImgs.map((src) => <Fig key={src} src={src} />)}
+        </>
+      )}
+      {ownImgs.map((src) => <Fig key={src} src={src} />)}
+    </>
+  );
+}
+
 function fmtTime(s) {
   const m = Math.floor(s / 60);
   return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -317,8 +345,7 @@ function Quiz({ session, setSession, onFinish, recordAnswers }) {
       <div className="bar"><div style={{ width: `${(100 * answeredCount) / list.length}%` }} /></div>
 
       <article className="card question">
-        <p className="stem">{cur.q}</p>
-        {cur.img && <img className="fig" src={cur.img} alt="Figura da questão original (FGV)" />}
+        <QuestionBody qq={cur} />
         <ol className="opts">
           {cur.opts.map((text, i) => {
             const L = LETTERS[i];
@@ -437,7 +464,7 @@ function Result({ session, onRestart }) {
               <summary>
                 <span className="badge small">{DISCIPLINES[qq.disc]}</span> {qq.q}
               </summary>
-              {qq.img && <img className="fig" src={qq.img} alt="Figura da questão original (FGV)" />}
+              {qq.imgs?.map((src) => <Fig key={src} src={src} />)}
               <p>
                 Sua resposta: <b className="bad">{given ? `${given}) ${qq.opts[LETTERS.indexOf(given)]}` : 'em branco'}</b>
               </p>

@@ -14,7 +14,7 @@ export const SOURCES = {
 export const ALL_QUESTIONS = [
   ...OFICIAIS.map((q) =>
     FIGURAS[q.id]
-      ? { ...q, source: 'fgv2024', img: FIGURAS[q.id], q: q.q.replace(/\s*\[⚠️[^\]]*\]\s*/, ' ') }
+      ? { ...q, source: 'fgv2024', imgs: FIGURAS[q.id], q: q.q.replace(/\s*\[⚠️[^\]]*\]\s*/, ' ') }
       : { ...q, source: 'fgv2024' },
   ),
   ...AUTORAIS.map((q) => ({ ...q, source: 'autoral' })),

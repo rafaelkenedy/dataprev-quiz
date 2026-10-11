@@ -48,31 +48,71 @@ const inBody = (pg, it) => it.y > 52 && it.y < pg.vp.height - 45;
 // Número da questão fica na margem esquerda da coluna (x≈43 ou x≈312)
 const atColLeft = (pg, it) => it.x < 55 || (it.x > pg.mid && it.x < pg.mid + 25);
 
-// Sequência de segmentos (página, coluna) a partir do número da questão até a alternativa (A)
+const isQuestionStart = (pg, it, n) =>
+  inBody(pg, it) && atColLeft(pg, it) && (it.str.trim() === String(n) || it.str.startsWith(`${n} `));
+
+// Segmentos (página, coluna) a partir de um ponto até o primeiro item que satisfaz isEnd,
+// seguindo o fluxo coluna esquerda → coluna direita → próxima página
+function walk(pages, page, col, top, isEnd) {
+  const segs = [];
+  for (let hop = 0; hop < 4; hop++) {
+    const cur = pages[page];
+    const colItems = cur.items.filter((it) => inBody(cur, it) && colOf(cur, it.x) === col && it.y > top).sort((a, b) => a.y - b.y);
+    const end = colItems.find((it) => isEnd(cur, it));
+    if (end) {
+      segs.push({ page, col, top, bottom: end.y - end.h, lines: colItems.filter((it) => it.y < end.y - end.h / 2) });
+      return segs;
+    }
+    segs.push({ page, col, top, bottom: cur.vp.height - 53, lines: colItems, continues: true });
+    if (col === 0) col = 1; else { col = 0; page++; }
+    if (page >= pages.length) return null;
+    top = 52;
+  }
+  return null;
+}
+
+// Do número da questão até a alternativa (A)
 function locate(pages, n) {
   for (let p = 1; p < pages.length; p++) { // página 0 é a capa
     const pg = pages[p];
-    const starts = pg.items.filter((it) => inBody(pg, it) && atColLeft(pg, it) && (it.str.trim() === String(n) || it.str.startsWith(`${n} `)));
-    for (const st of starts) {
-      const segs = [];
-      let page = p, col = colOf(pg, st.x), top = st.y - st.h;
-      for (let hop = 0; hop < 4; hop++) {
-        const cur = pages[page];
-        const colItems = cur.items.filter((it) => inBody(cur, it) && colOf(cur, it.x) === col && it.y > top).sort((a, b) => a.y - b.y);
-        const a = colItems.find((it) => /^\(A\)/.test(it.str.trim()));
-        if (a) {
-          segs.push({ page, col, top, bottom: a.y - a.h, lines: colItems.filter((it) => it.y < a.y - a.h / 2) });
-          return segs;
-        }
-        segs.push({ page, col, top, bottom: cur.vp.height - 45, lines: colItems, continues: true });
-        if (col === 0) col = 1; else { col = 0; page++; }
-        if (page >= pages.length) break;
-        top = 52;
-      }
+    for (const st of pg.items.filter((it) => isQuestionStart(pg, it, n))) {
+      const segs = walk(pages, p, colOf(pg, st.x), st.y - st.h, (_pg, it) => /^\(A\)/.test(it.str.trim()));
+      if (segs) return segs;
     }
   }
   return null;
 }
+
+// Texto-base compartilhado ("ATENÇÃO: …") cuja figura fica entre o texto e a 1ª questão do bloco
+const CONTEXT_FIGS = [
+  { label: 'Arquitetura', after: 'atenderá às consultas', firstN: 47, ids: ['fgv24-Arquitetura-47', 'fgv24-Arquitetura-48'] },
+];
+function locateContext(pages, after, firstN) {
+  for (let p = 1; p < pages.length; p++) {
+    const pg = pages[p];
+    const st = pg.items.find((it) => inBody(pg, it) && it.str.includes(after));
+    if (!st) continue;
+    const segs = walk(pages, p, colOf(pg, st.x), st.y, (cur, it) => isQuestionStart(cur, it, firstN));
+    // aqui a figura costuma ocupar o fim da coluna, então o espaço final conta
+    segs?.forEach((s) => (s.continues = false));
+    return segs;
+  }
+  return null;
+}
+
+// Recorta as lacunas (figuras) de uma lista de segmentos e junta numa imagem só
+async function cropSegs(pages, segs) {
+  const parts = [];
+  for (const seg of segs) {
+    for (const [y0, y1] of gaps(seg)) parts.push(await crop(pages[seg.page], seg.col, y0 + 3, y1 - 4));
+  }
+  return parts.length ? stack(parts) : null;
+}
+
+const savePng = (canvas, name) => {
+  fs.writeFileSync(path.join(OUT_DIR, name), Buffer.from(canvas.toDataURL('image/png').split(',')[1], 'base64'));
+  return `figuras/${name}`;
+};
 
 // Lacunas sem texto dentro de um segmento (onde estão as figuras)
 function gaps(seg) {
@@ -125,30 +165,32 @@ try {
   const questions = JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'provas-fgv2024.json'), 'utf8'));
   fs.rmSync(OUT_DIR, { recursive: true, force: true });
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  const manifest = {};
+  const manifest = {}; // id → [imagens], na ordem: texto-base, depois a da própria questão
+  const add = (id, src) => (manifest[id] ||= []).push(src);
   const cache = {};
-  const only = process.env.FIG_IDS ? new Set(process.env.FIG_IDS.split(',')) : null;
+  const pagesOf = async (label) => (cache[label] ||= await loadDoc(FILES[label]));
 
+  // 1) Figuras de textos-base compartilhados
+  for (const c of CONTEXT_FIGS) {
+    const pages = await pagesOf(c.label);
+    const segs = locateContext(pages, c.after, c.firstN);
+    const img = segs && (await cropSegs(pages, segs));
+    if (!img) { log(`?? texto-base "${c.after}": figura não encontrada`); continue; }
+    const src = savePng(img, `contexto-${c.ids[0]}.png`);
+    for (const id of c.ids) add(id, src);
+    log(`ok texto-base de ${c.ids.join(', ')}: ${img.width}x${img.height}`);
+  }
+
+  // 2) Figuras dentro de cada questão
   for (const q of questions) {
-    if (only && !only.has(q.id)) continue;
     const m = q.id.match(/^fgv24-(.+)-(\d+)$/);
-    const label = m[1].replace(/_/g, ' ');
-    const n = Number(m[2]);
-    const file = FILES[label];
-    cache[file] ||= await loadDoc(file);
-    const pages = cache[file];
-    const segs = locate(pages, n);
+    const pages = await pagesOf(m[1].replace(/_/g, ' '));
+    const segs = locate(pages, Number(m[2]));
     if (!segs) { log(`?? ${q.id}: não localizada`); continue; }
-    const parts = [];
-    for (const seg of segs) {
-      for (const [y0, y1] of gaps(seg)) parts.push(await crop(pages[seg.page], seg.col, y0 + 3, y1 - 4));
-    }
-    if (!parts.length) continue;
-    const img = stack(parts);
-    const name = `${q.id}.png`;
-    fs.writeFileSync(path.join(OUT_DIR, name), Buffer.from(img.toDataURL('image/png').split(',')[1], 'base64'));
-    manifest[q.id] = `figuras/${name}`;
-    log(`ok ${q.id}: ${parts.length} recorte(s), ${img.width}x${img.height}`);
+    const img = await cropSegs(pages, segs);
+    if (!img) continue;
+    add(q.id, savePng(img, `${q.id}.png`));
+    log(`ok ${q.id}: ${img.width}x${img.height}`);
   }
   fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 1));
   log(`\n${Object.keys(manifest).length} questões com figura → public/figuras/`);

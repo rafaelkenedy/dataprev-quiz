@@ -119,6 +119,12 @@ const HEADER_LINES = [
   /^(ATI|Analista)[^\n]* - (TARDE|MANHÃ)$/, /^Realização$/,
 ];
 const SECTION_LINE = /^(Conhecimentos Gerais\s*)?(Língua Portuguesa|Língua Inglesa|Raciocínio Lógico[^\n]*|Atualidades[^\n]*|Legislação[^\n]*|Segurança da Informação e[^\n]*|Conhecimentos Específicos)\s*$/;
+// "…as próximas três questões" / "…the next six questions" → 3 / 6 (sem indicação: até a próxima seção)
+const NUMS = { duas: 2, two: 2, três: 3, three: 3, quatro: 4, four: 4, cinco: 5, five: 5, seis: 6, six: 6, sete: 7, seven: 7 };
+function contextCount(text) {
+  const m = text.match(/(?:próximas|next)\s+([a-zà-ú]+)\s+(?:questões|questions)/i);
+  return (m && NUMS[m[1].toLowerCase()]) || Infinity;
+}
 const clean = (s) => s.replace(/\s+/g, ' ').replace(/ ([,.;:?!)])/g, '$1').trim();
 
 function parseProva(file, firstN = 1) {
@@ -139,6 +145,7 @@ function parseProva(file, firstN = 1) {
   let pos = text.search(new RegExp(`\\s${firstN}\\s+(?=[A-ZÀ-Ú“"'(])`));
   let section = firstN > 1 ? 'esp' : 'port';
   let context = '';
+  let contextLeft = 0; // quantas questões ainda usam o texto-base atual
   for (let n = firstN; n <= 70; n++) {
     let end;
     if (n < 70) {
@@ -168,6 +175,7 @@ function parseProva(file, firstN = 1) {
     if (idx.some((k) => k < 0)) {
       // conteúdo em imagem no PDF (código, tabela): não dá para reconstruir a questão
       qs.push({ n, broken: true });
+      contextLeft--; // ainda conta como uma das "próximas N questões" do texto-base
       pos = end;
       continue;
     }
@@ -177,7 +185,7 @@ function parseProva(file, firstN = 1) {
     let nextContext = null;
     let nextSection = null;
     const tailLines = tail.split('\n');
-    const cut = tailLines.findIndex((l, i) => i > 0 && (SECTION_LINE.test(l.trim()) || /^(Use the following|Read the|Leia o texto|Considere o texto)/i.test(l.trim())));
+    const cut = tailLines.findIndex((l, i) => i > 0 && (SECTION_LINE.test(l.trim()) || /^(Use the following|Read the|Leia o texto|Considere o texto|ATENÇÃO)/i.test(l.trim())));
     if (cut > 0) {
       const rest = tailLines.slice(cut);
       tail = tailLines.slice(0, cut).join('\n');
@@ -193,13 +201,18 @@ function parseProva(file, firstN = 1) {
     const stem = clean(block.slice(0, idx[0]));
     const opts = [0, 1, 2, 3].map((i) => clean(block.slice(idx[i] + 3, idx[i + 1])));
     opts.push(clean(tail));
-    qs.push({ n, section, context, stem, opts });
+    qs.push({ n, section, context: contextLeft > 0 ? context : '', stem, opts });
+    contextLeft--;
 
     if (nextSection && nextSection !== section) {
       section = nextSection;
       context = '';
+      contextLeft = 0;
     }
-    if (nextContext !== null) context = nextContext;
+    if (nextContext !== null) {
+      context = nextContext;
+      contextLeft = contextCount(nextContext);
+    }
     pos = end;
   }
   return qs;
