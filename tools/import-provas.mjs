@@ -126,6 +126,12 @@ function parseProva(file, firstN = 1) {
     .split(/\r?\n/)
     .filter((l) => !HEADER_LINES.some((re) => re.test(l.trim())))
     .join('\n');
+  // Rodapés/cabeçalhos que às vezes vêm colados no meio da linha (com hífen ou travessão)
+  text = text
+    .replace(/(?:ATI|Analista de Processamento)[^\n]{0,90}?[-–—]\s*(?:TARDE|MANHÃ)\b/gi, ' ')
+    .replace(/TIPO\s+BRANCA\s*[-–—]\s*PÁGINA\s*\d+/gi, ' ')
+    .replace(/EMPRESA DE TECNOLOGIA E INFORMAÇÕES DA PREVIDÊNCIA\s*[-–—]\s*DATAPREV/g, ' ')
+    .replace(/FGV CONHECIMENTO/g, ' ');
   const begin = firstN > 1 ? text.search(/Conhecimentos Específicos/) : text.search(/Conhecimentos Gerais/);
   text = '\n' + text.slice(begin);
 
