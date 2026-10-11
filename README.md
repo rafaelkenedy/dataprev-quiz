@@ -2,7 +2,7 @@
 
 Dois bancos de questões, à escolha no app:
 
-- **Oficiais FGV 2024 (154 questões):** questões reais do concurso DATAPREV 2024 (FGV), com gabarito definitivo.
+- **Oficiais FGV 2024 (153 questões):** questões reais do concurso DATAPREV 2024 (FGV), com gabarito definitivo.
   - A prova de *ATI – Desenvolvimento de Software* entra completa.
   - Dos perfis de Arquitetura, Análise de Negócio, Segurança Cibernética, Gestão de Serviços de TIC, Inteligência da Informação e Analista de Processamento entram só as específicas ligadas ao edital do Perfil 3 de 2026. Ficam de fora temas como redes, nuvem, estatística e contratações.
   - Fonte: [FGV Conhecimento – DATAPREV 2024](https://conhecimento.fgv.br/concursos/dataprev24).
