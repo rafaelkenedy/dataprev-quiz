@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { QUESTIONS, DISCIPLINES, SPECIFIC } from './questions.js';
+import { DISCIPLINES, SPECIFIC, SOURCES, bySource, FGV_SOURCE_URL } from './bank.js';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E'];
 const STATS_KEY = 'dataprev-quiz-stats-v1';
+const SOURCE_KEY = 'dataprev-quiz-source';
 const SECONDS_PER_QUESTION = 180; // ~3 min por questão na prova real (70 questões / 4h, descontando o gabarito)
 
 function loadStats() {
@@ -101,6 +102,22 @@ function Home({ stats, onStart, onReset }) {
   const [selected, setSelected] = useState(() => new Set(Object.keys(DISCIPLINES)));
   const [count, setCount] = useState(20);
   const [mode, setMode] = useState('treino');
+  const [source, setSource] = useState(() => {
+    try {
+      return localStorage.getItem(SOURCE_KEY) || 'fgv2024';
+    } catch {
+      return 'fgv2024';
+    }
+  });
+  const chooseSource = (s) => {
+    setSource(s);
+    try {
+      localStorage.setItem(SOURCE_KEY, s);
+    } catch {
+      /* preferência é só conveniência */
+    }
+  };
+  const QUESTIONS = useMemo(() => bySource(source), [source]);
 
   const byDisc = useMemo(() => {
     const m = {};
@@ -115,7 +132,7 @@ function Home({ stats, onStart, onReset }) {
       }
     }
     return m;
-  }, [stats]);
+  }, [stats, QUESTIONS]);
 
   const wrong = QUESTIONS.filter((qq) => stats[qq.id]?.last === false);
   const unseen = QUESTIONS.filter((qq) => !stats[qq.id]);
@@ -131,6 +148,23 @@ function Home({ stats, onStart, onReset }) {
     <main className="home">
       <section className="card">
         <h2>Novo bloco de questões</h2>
+        <div className="field source">
+          Banco de questões
+          <div className="seg">
+            {Object.entries(SOURCES).map(([key, label]) => (
+              <button key={key} className={source === key ? 'active' : ''} onClick={() => chooseSource(key)}>
+                {label} ({bySource(key).length})
+              </button>
+            ))}
+          </div>
+          <span className="hint small">
+            {source === 'autoral'
+              ? 'Questões inéditas no estilo FGV, com explicação do gabarito.'
+              : source === 'fgv2024'
+                ? <>Questões reais da FGV (DATAPREV 2024) ligadas ao edital do Perfil 3, com gabarito definitivo. <a href={FGV_SOURCE_URL} target="_blank" rel="noreferrer">Fonte: FGV</a></>
+                : 'Oficiais FGV 2024 + autorais.'}
+          </span>
+        </div>
         <div className="disc-head">
           <span>Disciplinas</span>
           <span className="links">
@@ -177,7 +211,7 @@ function Home({ stats, onStart, onReset }) {
         </div>
         <p className="hint">
           {mode === 'treino'
-            ? 'Treino: correção e explicação logo após cada resposta.'
+            ? 'Treino: correção logo após cada resposta (com explicação nas autorais).'
             : 'Simulado: cronômetro e correção apenas no final, como na prova.'}
         </p>
         <button className="primary" disabled={!pool.length} onClick={() => onStart(shuffle(pool).slice(0, count), mode)}>
@@ -274,6 +308,7 @@ function Quiz({ session, setSession, onFinish, recordAnswers }) {
     <main className="quiz">
       <div className="quiz-head">
         <span className="badge">{DISCIPLINES[cur.disc]}</span>
+        {cur.source === 'fgv2024' && <span className="badge official">Prova oficial</span>}
         <span className="progress-text">Questão {idx + 1} de {list.length}</span>
         {mode === 'simulado' && (
           <span className={`timer ${remaining < 300 ? 'low' : ''}`}>⏱ {fmtTime(remaining)}</span>
@@ -306,7 +341,8 @@ function Quiz({ session, setSession, onFinish, recordAnswers }) {
         {isRevealed && (
           <div className={`feedback ${chosen === cur.ans ? 'ok' : 'ko'}`}>
             <strong>{chosen === cur.ans ? 'Correto!' : `Errado. Gabarito: ${cur.ans}`}</strong>
-            <p>{cur.exp}</p>
+            {cur.exp ? <p>{cur.exp}</p> : <p>Gabarito oficial definitivo da FGV.</p>}
+            {cur.ref && <p className="ref">{cur.ref}</p>}
           </div>
         )}
       </article>
@@ -404,7 +440,8 @@ function Result({ session, onRestart }) {
                 Sua resposta: <b className="bad">{given ? `${given}) ${qq.opts[LETTERS.indexOf(given)]}` : 'em branco'}</b>
               </p>
               <p>Gabarito: <b className="good">{qq.ans}) {qq.opts[LETTERS.indexOf(qq.ans)]}</b></p>
-              <p className="exp">{qq.exp}</p>
+              {qq.exp && <p className="exp">{qq.exp}</p>}
+              {qq.ref && <p className="ref">{qq.ref}</p>}
             </details>
           ))}
         </section>

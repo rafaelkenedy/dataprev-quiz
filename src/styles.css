@@ -229,3 +229,16 @@ kbd {
   .opt:hover:not(:disabled), .secondary:hover:not(:disabled) { border-color: var(--border); }
   .opt.chosen:hover { border-color: var(--accent); }
 }
+
+/* Banco de questões (oficiais x autorais) */
+.field.source { margin-bottom: 16px; }
+.field.source .seg { width: fit-content; max-width: 100%; }
+.hint.small { margin: 2px 0 0; font-size: 12px; }
+.hint a { color: var(--accent); }
+.badge.official { background: var(--good-soft); color: var(--good); }
+.stem { white-space: pre-line; }
+.ref { color: var(--muted); font-size: 12px; margin-top: 8px !important; }
+@media (max-width: 600px) {
+  .field.source .seg { width: 100%; }
+  .field.source .seg button { font-size: 13px; padding: 10px 4px; }
+}
