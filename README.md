@@ -36,3 +36,10 @@ O mapeamento de cada questão para os temas do edital é feito por palavras-chav
 
 ## Adicionar questões autorais
 Edite `src/questions.js`: `q('disc', 'enunciado', [5 alternativas], 'letra', 'explicação')`.
+
+## Figuras das questões oficiais
+Código, SQL e diagramas que estavam como imagem nos PDFs são recortados direto dos PDFs oficiais com pdf.js:
+```
+node_modules/electron/dist/electron tools/figuras/main.cjs ../provas
+```
+O resultado fica em `public/figuras/` e `src/figuras.json`.

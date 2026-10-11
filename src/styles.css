@@ -242,3 +242,9 @@ kbd {
   .field.source .seg { width: 100%; }
   .field.source .seg button { font-size: 13px; padding: 10px 4px; }
 }
+
+/* Figuras recortadas das provas oficiais */
+.fig {
+  display: block; max-width: 100%; height: auto; margin: -4px 0 16px;
+  background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px;
+}

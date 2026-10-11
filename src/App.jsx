@@ -318,6 +318,7 @@ function Quiz({ session, setSession, onFinish, recordAnswers }) {
 
       <article className="card question">
         <p className="stem">{cur.q}</p>
+        {cur.img && <img className="fig" src={cur.img} alt="Figura da questão original (FGV)" />}
         <ol className="opts">
           {cur.opts.map((text, i) => {
             const L = LETTERS[i];
@@ -436,6 +437,7 @@ function Result({ session, onRestart }) {
               <summary>
                 <span className="badge small">{DISCIPLINES[qq.disc]}</span> {qq.q}
               </summary>
+              {qq.img && <img className="fig" src={qq.img} alt="Figura da questão original (FGV)" />}
               <p>
                 Sua resposta: <b className="bad">{given ? `${given}) ${qq.opts[LETTERS.indexOf(given)]}` : 'em branco'}</b>
               </p>
