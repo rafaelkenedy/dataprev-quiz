@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { DISCIPLINES, SPECIFIC, SOURCES, bySource, FGV_SOURCE_URL } from './bank.js';
+import { DISCIPLINES, SPECIFIC, SOURCES, SOURCE_INFO, bySource, provasOf, cadernos, isOfficial } from './bank.js';
+import RichText, { Inline, plainText } from './RichText.jsx';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E'];
 const STATS_KEY = 'dataprev-quiz-stats-v1';
 const SOURCE_KEY = 'dataprev-quiz-source';
+const CADERNO_KEY = 'dataprev-quiz-caderno';
 const SECONDS_PER_QUESTION = 180; // ~3 min por questão na prova real (70 questões / 4h, descontando o gabarito)
 
 function loadStats() {
@@ -39,33 +41,36 @@ function shuffleOptions(qq) {
   return { ...qq, opts: perm.map((i) => qq.opts[i]), ans: LETTERS[perm.indexOf(correctIdx)] };
 }
 
-const Fig = ({ src }) => <img className="fig" src={src} alt="Figura da questão original (FGV)" />;
-
-// Enunciado com figuras: a do texto-base compartilhado ("contexto-…") fica logo após o texto-base,
-// antes da pergunta; as da própria questão ficam depois do enunciado.
+// Enunciado: texto-base compartilhado (quando houver) em destaque, depois o enunciado da questão.
+// Figuras, listas, código e tabelas vêm na própria marcação do texto (ver RichText.jsx).
 function QuestionBody({ qq }) {
-  const imgs = qq.imgs || [];
-  const ctxImgs = imgs.filter((src) => src.includes('/contexto-'));
-  const ownImgs = imgs.filter((src) => !src.includes('/contexto-'));
-  const split = ctxImgs.length ? qq.q.indexOf('\n\n') : -1;
   return (
     <>
-      {split > 0 ? (
-        <>
-          <p className="stem">{qq.q.slice(0, split)}</p>
-          {ctxImgs.map((src) => <Fig key={src} src={src} />)}
-          <p className="stem">{qq.q.slice(split + 2)}</p>
-        </>
-      ) : (
-        <>
-          <p className="stem">{qq.q}</p>
-          {ctxImgs.map((src) => <Fig key={src} src={src} />)}
-        </>
+      {qq.ctx && (
+        <section className="ctx">
+          <div className="ctx-label">Texto-base</div>
+          <RichText text={qq.ctx} />
+        </section>
       )}
-      {ownImgs.map((src) => <Fig key={src} src={src} />)}
+      <RichText text={qq.q} className="stem" />
     </>
   );
 }
+
+const readLocal = (key, fallback) => {
+  try {
+    return localStorage.getItem(key) || fallback;
+  } catch {
+    return fallback;
+  }
+};
+const writeLocal = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* preferência é só conveniência */
+  }
+};
 
 function fmtTime(s) {
   const m = Math.floor(s / 60);
@@ -131,21 +136,25 @@ function Home({ stats, onStart, onReset }) {
   const [count, setCount] = useState(20);
   const [mode, setMode] = useState('treino');
   const [source, setSource] = useState(() => {
-    try {
-      return localStorage.getItem(SOURCE_KEY) || 'fgv2024';
-    } catch {
-      return 'fgv2024';
-    }
+    const s = readLocal(SOURCE_KEY, 'fgv2026');
+    return s in SOURCES ? s : 'todas';
   });
+  const [caderno, setCaderno] = useState(() => readLocal(CADERNO_KEY, 'todos'));
   const chooseSource = (s) => {
     setSource(s);
-    try {
-      localStorage.setItem(SOURCE_KEY, s);
-    } catch {
-      /* preferência é só conveniência */
-    }
+    writeLocal(SOURCE_KEY, s);
   };
-  const QUESTIONS = useMemo(() => bySource(source), [source]);
+  const chooseCaderno = (c) => {
+    setCaderno(c);
+    writeLocal(CADERNO_KEY, c);
+  };
+  const ofSource = useMemo(() => bySource(source), [source]);
+  const provas = useMemo(() => provasOf(ofSource), [ofSource]);
+  const activeCaderno = provas.includes(caderno) ? caderno : 'todos';
+  const QUESTIONS = useMemo(
+    () => (activeCaderno === 'todos' ? ofSource : ofSource.filter((qq) => isOfficial(qq) && cadernos(qq).includes(activeCaderno))),
+    [ofSource, activeCaderno],
+  );
 
   const byDisc = useMemo(() => {
     const m = {};
@@ -186,13 +195,21 @@ function Home({ stats, onStart, onReset }) {
             ))}
           </div>
           <span className="hint small">
-            {source === 'autoral'
-              ? 'Questões inéditas no estilo FGV, com explicação do gabarito.'
-              : source === 'fgv2024'
-                ? <>Questões reais da FGV (DATAPREV 2024) ligadas ao edital do Perfil 3, com gabarito definitivo. <a href={FGV_SOURCE_URL} target="_blank" rel="noreferrer">Fonte: FGV</a></>
-                : 'Oficiais FGV 2024 + autorais.'}
+            {SOURCE_INFO[source].text}{' '}
+            {SOURCE_INFO[source].url && <a href={SOURCE_INFO[source].url} target="_blank" rel="noreferrer">Fonte: FGV</a>}
           </span>
         </div>
+        {provas.length > 1 && (
+          <label className="field caderno">
+            Caderno (perfil)
+            <select value={activeCaderno} onChange={(e) => chooseCaderno(e.target.value)}>
+              <option value="todos">Todos os cadernos</option>
+              {provas.map((p) => (
+                <option key={p} value={p}>{p} ({ofSource.filter((qq) => cadernos(qq).includes(p)).length})</option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="disc-head">
           <span>Disciplinas</span>
           <span className="links">
@@ -336,7 +353,7 @@ function Quiz({ session, setSession, onFinish, recordAnswers }) {
     <main className="quiz">
       <div className="quiz-head">
         <span className="badge">{DISCIPLINES[cur.disc]}</span>
-        {cur.source === 'fgv2024' && <span className="badge official">Prova oficial</span>}
+        {isOfficial(cur) && <span className="badge official">{cur.ref.match(/^FGV \d+/)[0]} · {cadernos(cur)[0]}</span>}
         <span className="progress-text">Questão {idx + 1} de {list.length}</span>
         {mode === 'simulado' && (
           <span className={`timer ${remaining < 300 ? 'low' : ''}`}>⏱ {fmtTime(remaining)}</span>
@@ -359,7 +376,7 @@ function Quiz({ session, setSession, onFinish, recordAnswers }) {
               <li key={L}>
                 <button className={cls} onClick={() => choose(L)} disabled={isRevealed}>
                   <span className="letter">{L}</span>
-                  <span>{text}</span>
+                  <span className="opt-text"><Inline text={text} /></span>
                 </button>
               </li>
             );
@@ -369,7 +386,13 @@ function Quiz({ session, setSession, onFinish, recordAnswers }) {
         {isRevealed && (
           <div className={`feedback ${chosen === cur.ans ? 'ok' : 'ko'}`}>
             <strong>{chosen === cur.ans ? 'Correto!' : `Errado. Gabarito: ${cur.ans}`}</strong>
-            {cur.exp ? <p>{cur.exp}</p> : <p>Gabarito oficial definitivo da FGV.</p>}
+            {cur.exp ? (
+              <p>{cur.exp}</p>
+            ) : cur.gab === 'preliminar' ? (
+              <p>Gabarito oficial <b>preliminar</b> da FGV (13/10/2026). Pode mudar depois do julgamento dos recursos.</p>
+            ) : (
+              <p>Gabarito oficial definitivo da FGV.</p>
+            )}
             {cur.ref && <p className="ref">{cur.ref}</p>}
           </div>
         )}
@@ -462,13 +485,14 @@ function Result({ session, onRestart }) {
           {wrong.map(({ qq, given }) => (
             <details key={qq.id} className="review">
               <summary>
-                <span className="badge small">{DISCIPLINES[qq.disc]}</span> {qq.q}
+                <span className="badge small">{DISCIPLINES[qq.disc]}</span> {plainText(qq.q).slice(0, 160)}
+                {plainText(qq.q).length > 160 && '…'}
               </summary>
-              {qq.imgs?.map((src) => <Fig key={src} src={src} />)}
+              <QuestionBody qq={qq} />
               <p>
-                Sua resposta: <b className="bad">{given ? `${given}) ${qq.opts[LETTERS.indexOf(given)]}` : 'em branco'}</b>
+                Sua resposta: <b className="bad">{given ? <>{given}) <Inline text={qq.opts[LETTERS.indexOf(given)]} /></> : 'em branco'}</b>
               </p>
-              <p>Gabarito: <b className="good">{qq.ans}) {qq.opts[LETTERS.indexOf(qq.ans)]}</b></p>
+              <p>Gabarito: <b className="good">{qq.ans}) <Inline text={qq.opts[LETTERS.indexOf(qq.ans)]} /></b></p>
               {qq.exp && <p className="exp">{qq.exp}</p>}
               {qq.ref && <p className="ref">{qq.ref}</p>}
             </details>

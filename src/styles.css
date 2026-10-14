@@ -12,6 +12,8 @@
   --bad-soft: #fbe7e6;
   --mid: #b7791f;
   --shadow: 0 1px 3px rgba(20, 30, 50, 0.08);
+  --code-bg: #f1f3f7;
+  --ctx-bg: #f7f9fd;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -29,6 +31,8 @@
     --bad-soft: #351a19;
     --mid: #e0a84a;
     --shadow: none;
+    --code-bg: #11141a;
+    --ctx-bg: #1b2030;
   }
 }
 
@@ -236,15 +240,56 @@ kbd {
 .hint.small { margin: 2px 0 0; font-size: 12px; }
 .hint a { color: var(--accent); }
 .badge.official { background: var(--good-soft); color: var(--good); }
-.stem { white-space: pre-line; }
 .ref { color: var(--muted); font-size: 12px; margin-top: 8px !important; }
 @media (max-width: 600px) {
   .field.source .seg { width: 100%; }
   .field.source .seg button { font-size: 13px; padding: 10px 4px; }
 }
 
+/* Texto rico das questões (RichText.jsx): parágrafos, listas, código, tabelas e figuras */
+.rich > * { margin: 0 0 12px; }
+.rich > :last-child { margin-bottom: 0; }
+.rich.stem { margin-bottom: 18px; }
+.rich p { line-height: 1.6; }
+.rich code {
+  font: 0.9em/1.4 ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace;
+  background: var(--code-bg); border-radius: 4px; padding: 1px 4px;
+}
+.rich pre.code {
+  background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.rich pre.code code { background: none; padding: 0; font-size: 13.5px; white-space: pre; font-variant-ligatures: none; }
+.rich ul.items { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rich ul.items li { display: flex; gap: 10px; line-height: 1.55; }
+.rich .marker {
+  flex: none; min-width: 26px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums;
+}
+.table-wrap { overflow-x: auto; }
+.rich table { border-collapse: collapse; font-size: 14px; }
+.rich td { border: 1px solid var(--border); padding: 6px 10px; vertical-align: top; }
+.ctx {
+  background: var(--ctx-bg); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0;
+  padding: 12px 16px; margin-bottom: 18px; font-size: 15px;
+}
+.ctx-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 8px;
+}
+.opt-text { line-height: 1.5; }
+.opt-text code {
+  font: 0.9em ui-monospace, Consolas, monospace; background: var(--code-bg); border-radius: 4px; padding: 0 4px;
+}
+.field.caderno { margin: -4px 0 16px; max-width: 360px; }
+.review .ctx, .review .rich.stem { margin-top: 10px; font-size: 14px; }
+
 /* Figuras recortadas das provas oficiais */
 .fig {
-  display: block; max-width: 100%; height: auto; margin: -4px 0 16px;
+  display: block; max-width: 100%; height: auto;
   background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px;
+}
+@media (max-width: 600px) {
+  .ctx { padding: 10px 12px; font-size: 14.5px; }
+  .rich pre.code code { font-size: 12px; }
+  .field.caderno { max-width: none; }
 }

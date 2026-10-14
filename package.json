@@ -2,12 +2,13 @@
   "name": "dataprev-quiz",
   "version": "1.0.0",
   "private": true,
-  "description": "Revisão de questões – DATAPREV 2026 – Desenvolvimento de Software",
+  "description": "Revisão de questões – DATAPREV – Desenvolvimento de Software (provas FGV 2026 e 2024)",
   "main": "electron/main.cjs",
   "scripts": {
     "start": "vite build && electron .",
     "web": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "importar": "node tools/import-provas.mjs ../provas && electron tools/figuras/main.cjs"
   },
   "dependencies": {
     "react": "18.3.1",

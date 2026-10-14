@@ -8,6 +8,7 @@ export const DISCIPLINES = {
   seg: 'Segurança da Informação',
   bd: 'Banco de Dados e BI',
   gov: 'Gestão e Governança de TI',
+  outros: 'Outros temas de TI (redes, nuvem, infra, dados)',
   leg: 'Legislação (LGPD, LAI, Marco Civil)',
   ia: 'Atualidades e IA',
   rlm: 'Raciocínio Lógico',
@@ -15,7 +16,8 @@ export const DISCIPLINES = {
 };
 
 // Disciplinas que valem peso 2,5 (Conhecimentos Específicos)
-export const SPECIFIC = new Set(['dev', 'arq', 'proc', 'seg', 'bd', 'gov']);
+// "outros": específicas dos demais cadernos de TI da prova de 2026, fora dos temas acima
+export const SPECIFIC = new Set(['dev', 'arq', 'proc', 'seg', 'bd', 'gov', 'outros']);
 
 let n = 0;
 const q = (disc, text, opts, ans, exp) => ({ id: `${disc}-${++n}`, disc, q: text, opts, ans, exp });
